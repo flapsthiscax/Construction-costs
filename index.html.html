@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Construction Cost Escalator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Quick ROMs and cost escalation for Vancouver and Calgary construction, built on StatCan's building price index plus Altus, RLB, Turner & Townsend and Cushman & Wakefield data.">
+<meta name="theme-color" content="#07061a">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Construction Cost Escalator">
+<meta property="og:description" content="Quick ROMs and cost escalation for Vancouver and Calgary construction.">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="wrap" id="app" data-city="compare">
+
+  <header class="top">
+    <div>
+      <div class="eyebrow">Hard-cost intelligence · Vancouver &amp; Calgary</div>
+      <h1>Construction Cost Escalator</h1>
+      <p class="lede">Build a quick ROM, bring an old project's cost up to today, and see where five public sources think costs are heading.</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="City">
+        <button id="c-vancouver" data-city="vancouver" aria-pressed="false"><span class="sw" style="background:var(--van)"></span>Vancouver</button>
+        <button id="c-calgary" data-city="calgary" aria-pressed="false"><span class="sw" style="background:var(--cal)"></span>Calgary</button>
+        <button id="c-compare" data-city="compare" aria-pressed="true">Compare</button>
+      </div>
+      <span class="status"><i></i>StatCan index through Q3 2026 · refreshed Oct 29, 2026</span>
+    </div>
+  </header>
+
+  <section class="kpis" id="kpis" aria-label="Headline numbers"></section>
+
+  <!-- Calculator -->
+  <section class="panel calc-panel" aria-labelledby="h-calc">
+    <div class="ph">
+      <div>
+        <h2 id="h-calc">Calculator</h2>
+        <p class="sub" id="calcSub"></p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Calculator mode">
+        <button role="tab" id="t-rom" aria-controls="p-rom" aria-selected="true">Quick ROM</button>
+        <button role="tab" id="t-esc" aria-controls="p-esc" aria-selected="false">Escalate a past project</button>
+      </div>
+    </div>
+
+    <!-- ROM -->
+    <div class="pb calc" id="p-rom" role="tabpanel" aria-labelledby="t-rom">
+      <div class="inputs">
+        <label class="f wide" for="romType">Building type
+          <select id="romType"></select>
+        </label>
+        <label class="f wide" for="romArea">Gross floor area
+          <span class="unit"><input id="romArea" inputmode="numeric" value="50,000" autocomplete="off"><span>sf</span></span>
+        </label>
+        <label class="f wide" for="romAt">Price at
+          <select id="romAt"></select>
+        </label>
+        <div class="f wide sc-wrap"><span>Forecast scenario</span>
+          <span class="mini" role="group" aria-label="Forecast scenario">
+            <button data-sc="low" aria-pressed="false">Low</button>
+            <button data-sc="mid" aria-pressed="true">Mid</button>
+            <button data-sc="high" aria-pressed="false">High</button>
+          </span>
+        </div>
+      </div>
+      <div class="out">
+        <div class="results" id="romResults"></div>
+        <div class="out-foot">
+          <p class="note" id="romNote"></p>
+          <button class="copy" id="romCopy" type="button">Copy summary</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Escalate -->
+    <div class="pb calc" id="p-esc" role="tabpanel" aria-labelledby="t-esc" hidden>
+      <div class="inputs">
+        <label class="f wide" for="amt">Project cost
+          <span class="money"><span>$</span><input id="amt" inputmode="decimal" value="10,000,000" autocomplete="off"></span>
+        </label>
+        <label class="f wide" for="btype">Building type
+          <select id="btype"></select>
+        </label>
+        <label class="f" for="yfrom">Priced in
+          <select id="yfrom"></select>
+        </label>
+        <div class="f"><span>Quarter</span>
+          <span class="mini q" role="group" aria-label="Quarter priced" id="qfromQ">
+            <button data-q="1" aria-pressed="false">Q1</button><button data-q="2" aria-pressed="true">Q2</button><button data-q="3" aria-pressed="false">Q3</button><button data-q="4" aria-pressed="false">Q4</button>
+          </span>
+        </div>
+        <label class="f wide" for="qto">Escalate to
+          <select id="qto"></select>
+        </label>
+        <div class="f wide sc-wrap"><span>Forecast scenario</span>
+          <span class="mini" role="group" aria-label="Forecast scenario">
+            <button data-sc="low" aria-pressed="false">Low</button>
+            <button data-sc="mid" aria-pressed="true">Mid</button>
+            <button data-sc="high" aria-pressed="false">High</button>
+          </span>
+        </div>
+      </div>
+      <div class="out">
+        <div class="results" id="escResults"></div>
+        <div class="calc-chart"><canvas id="calcChart" aria-label="Escalation path"></canvas></div>
+        <div class="out-foot">
+          <p class="note" id="escNote"></p>
+          <button class="copy" id="escCopy" type="button">Copy summary</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Index -->
+  <section class="panel" aria-labelledby="h-idx">
+    <div class="ph">
+      <div>
+        <h2 id="h-idx">Building price index</h2>
+        <p class="sub">Statistics Canada table 18-10-0289-01, quarterly, all trade divisions, 2023 = 100. Not seasonally adjusted.</p>
+      </div>
+      <div class="row">
+        <select id="itype" aria-label="Building type"></select>
+        <span class="mini" role="group" aria-label="Time range" id="irange">
+          <button data-r="5" aria-pressed="false">5Y</button>
+          <button data-r="10" aria-pressed="true">10Y</button>
+          <button data-r="20" aria-pressed="false">20Y</button>
+          <button data-r="0" aria-pressed="false">Max</button>
+        </span>
+        <span class="mini" role="group" aria-label="Index view" id="imode">
+          <button data-m="cum" aria-pressed="true">Cumulative</button>
+          <button data-m="yoy" aria-pressed="false">YoY %</button>
+          <button data-m="raw" aria-pressed="false">Index</button>
+        </span>
+      </div>
+    </div>
+    <div class="pb">
+      <div class="legend">
+        <span><i style="background:var(--van)"></i>Vancouver</span>
+        <span><i style="background:var(--cal)"></i>Calgary</span>
+        <span><i class="dash"></i>15-city composite</span>
+        <span class="lg-note" id="idxNote"></span>
+      </div>
+      <div class="chart"><canvas id="idxChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- Cost ranges -->
+  <section class="panel" aria-labelledby="h-rng">
+    <div class="ph">
+      <div>
+        <h2 id="h-rng">Hard-cost ranges</h2>
+        <p class="sub" id="rngSub"></p>
+      </div>
+      <div class="row" id="sectors" role="group" aria-label="Sector"></div>
+    </div>
+    <div class="pb">
+      <div class="caveat" id="rngCaveat" hidden><b>!</b><span>Vancouver figures come from Altus and Calgary from RLB. The two publishers scope buildings differently, so part of each gap is method, not market. Building types are paired on the closest match.</span></div>
+      <div class="legend" id="rngLegend"></div>
+      <div class="chart" id="rngBox"><canvas id="rngChart"></canvas></div>
+      <div class="tbl-wrap"><table id="rngTable"></table></div>
+    </div>
+    <div class="foot">Hard construction costs only, CAD $/sf. Excludes land, soft costs and GST. Altus Canadian Cost Guide 2024 &amp; 2026 (Vancouver); RLB Quarterly Cost Report Q3 2026 (Calgary).</div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel" aria-labelledby="h-out">
+      <div class="ph">
+        <div>
+          <h2 id="h-out">Escalation outlook</h2>
+          <p class="sub">Turner &amp; Townsend bid-price forecasts by province. The faded bars show their Q1 2026 call, so you can see how it moved.</p>
+        </div>
+      </div>
+      <div class="pb">
+        <div class="legend">
+          <span><i class="box" style="background:var(--van)"></i>BC · Q3 2026</span>
+          <span><i class="box" style="background:var(--cal)"></i>Alberta · Q3 2026</span>
+          <span><i class="box" style="background:rgba(255,255,255,.18)"></i>Q1 2026 call</span>
+        </div>
+        <div class="chart" style="height:220px"><canvas id="fcChart"></canvas></div>
+        <p class="note">National bid-price baseline: 3.0% (2026), 3.75% (2027), 4.0% (2028), ±2.0 pts. The calculator uses 4.0% for 2028 in both provinces.</p>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-sig">
+      <div class="ph">
+        <div>
+          <h2 id="h-sig">What the sources say</h2>
+          <p class="sub">Most recent escalation reading from each publisher.</p>
+        </div>
+      </div>
+      <div class="pb"><div class="sig" id="signals"></div></div>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="panel" aria-labelledby="h-fit">
+      <div class="ph">
+        <div>
+          <h2 id="h-fit">Office fit-out by trade</h2>
+          <p class="sub">Cushman &amp; Wakefield 2026, first-generation interior fit-out, CAD $/sf. Second-generation space runs 10–15% lower.</p>
+        </div>
+      </div>
+      <div class="pb">
+        <div class="fit-tot" id="fitTot"></div>
+        <div class="chart" style="height:330px"><canvas id="fitChart"></canvas></div>
+      </div>
+      <div class="foot">Excludes soft costs, low-voltage/IT, A/V and FF&amp;E. Priced at December 2025.</div>
+    </section>
+
+    <div class="stack">
+      <section class="panel" aria-labelledby="h-alt">
+        <div class="ph">
+          <div>
+            <h2 id="h-alt">Vancouver escalation history</h2>
+            <p class="sub">Altus year-over-year change by building type, midpoint of the low and high range.</p>
+          </div>
+          <select id="altSel" aria-label="Altus building type">
+            <option value="overall">All types</option>
+            <option value="warehouse">Industrial warehouse</option>
+            <option value="concreteMF">Multifamily, concrete</option>
+            <option value="woodframeMF">Multifamily, wood frame</option>
+            <option value="office">Office (&lt;5 storeys)</option>
+            <option value="parking">Underground parking</option>
+            <option value="retail">Retail strip plaza</option>
+            <option value="storage">Storage facility</option>
+          </select>
+        </div>
+        <div class="pb"><div class="chart" style="height:190px"><canvas id="altChart"></canvas></div></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-lab">
+        <div class="ph">
+          <div>
+            <h2 id="h-lab">Labour pressure to 2035</h2>
+            <p class="sub">BuildForce Canada 2026–2035 outlook. Trades shortages are the main cost risk Altus and T&amp;T flag for Alberta.</p>
+          </div>
+        </div>
+        <div class="pb lab-grid">
+          <div class="lab"><h3 style="color:var(--van)">British Columbia</h3><dl>
+            <dt>Non-res employment</dt><dd>+5%</dd>
+            <dt>Residential employment</dt><dd>−13%</dd>
+            <dt>Retirements</dt><dd>46,700</dd>
+            <dt>Workers needed</dt><dd>48,200</dd>
+            <dt>Shortfall</dt><dd>7,400</dd></dl></div>
+          <div class="lab"><h3 style="color:var(--cal)">Alberta</h3><dl>
+            <dt>Non-res employment</dt><dd>+15%</dd>
+            <dt>Residential employment</dt><dd>−16%</dd>
+            <dt>Retirements</dt><dd>43,700</dd>
+            <dt>Workers needed</dt><dd>48,800</dd>
+            <dt>Shortfall</dt><dd>up to 5,300</dd></dl></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel" aria-labelledby="h-src">
+    <div class="ph"><div>
+      <h2 id="h-src">Sources</h2>
+      <p class="sub">Gated sources need a sign-up download. Once a PDF is in hand, its figures can be added in the next refresh.</p>
+    </div></div>
+    <div class="pb src-list" id="sources"></div>
+  </section>
+
+  <footer>Figures are as published by each source. Only the calculator's forward quarters are projected. ROMs are order-of-magnitude only and exclude soft costs, land and GST.</footer>
+</div>
+<script src="data/data.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
